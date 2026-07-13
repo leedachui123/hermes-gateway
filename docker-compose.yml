@@ -1,0 +1,37 @@
+version: "3.9"
+
+# Hermes Gateway + Nginx 一键部署
+# 如果是 Hermes 也在 Docker 中运行，添加到 same network 即可
+#
+# 使用前配置：
+#   1. 生成自签证书或准备 TLS 证书
+#   2. 设置环境变量（见 .env.example）
+
+services:
+  gateway:
+    build: .
+    container_name: hermes-gateway
+    restart: unless-stopped
+    environment:
+      - GATEWAY_SECRET_KEY=${GATEWAY_SECRET_KEY:?必须设置 GATEWAY_SECRET_KEY}
+      - GATEWAY_USERNAME=${GATEWAY_USERNAME:-admin}
+      - GATEWAY_PASSWORD=${GATEWAY_PASSWORD:?必须设置 GATEWAY_PASSWORD}
+      - HERMES_BASE_URL=http://host.docker.internal:9090
+      - GATEWAY_COOKIE_SECURE=true
+    ports:
+      - "127.0.0.1:8000:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # 如果已有 Nginx，可以省略此服务
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: hermes-nginx
+  #   restart: unless-stopped
+  #   ports:
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx/hermes.conf:/etc/nginx/conf.d/hermes.conf:ro
+  #     - /path/to/ssl:/etc/nginx/ssl:ro
+  #   depends_on:
+  #     - gateway
