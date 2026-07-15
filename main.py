@@ -24,7 +24,7 @@ templates = Jinja2Templates(directory="templates")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.httpx_client = httpx.AsyncClient(
-        base_url=HERMES_BASE_URL, timeout=60.0, follow_redirects=False
+        base_url=HERMES_BASE_URL, timeout=60.0, follow_redirects=False, trust_env=False
     )
     yield
     await app.state.httpx_client.aclose()
@@ -65,7 +65,7 @@ async def auth_middleware(request: Request, call_next):
 # ---------- routes ----------
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, error: str = None):
-    return templates.TemplateResponse("login.html", {"request": request, "error": error})
+    return templates.TemplateResponse(request, "login.html", {"error": error})
 
 
 @app.post("/api/login")
@@ -76,11 +76,28 @@ async def login_action(request: Request):
 
     if not username or not password:
         return templates.TemplateResponse(
-            "login.html", {"request": request, "error": "Username and password are required"},
+            request, "login.html", {"error": "Username and password are required"},
             status_code=422,
         )
 
     if authenticate(username, password):
+        # 验证 Hermes 后端连通性
+        client: httpx.AsyncClient = request.app.state.httpx_client
+        try:
+            await client.get("/", timeout=5.0)
+        except httpx.ConnectError:
+            return templates.TemplateResponse(
+                request, "login.html",
+                {"error": "Hermes 后端无法连接，请确认服务已启动后重试"},
+                status_code=503,
+            )
+        except httpx.TimeoutException:
+            return templates.TemplateResponse(
+                request, "login.html",
+                {"error": "Hermes 后端响应超时，请稍后重试"},
+                status_code=504,
+            )
+
         token = create_access_token(username)
         resp = RedirectResponse(url="/", status_code=302)
         resp.set_cookie(
@@ -94,7 +111,7 @@ async def login_action(request: Request):
         return resp
 
     return templates.TemplateResponse(
-        "login.html", {"request": request, "error": "Invalid username or password"},
+        request, "login.html", {"error": "Invalid username or password"},
         status_code=401,
     )
 
