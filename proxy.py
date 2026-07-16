@@ -14,7 +14,7 @@ HOP_BY_HOP_HEADERS = frozenset({
 
 
 async def proxy_request(client: httpx.AsyncClient, request: Request, path: str):
-    url = httpx.URL(path=path, query=request.url.query.decode())
+    url = httpx.URL(path=path, query=request.url.query.encode())
     body = await request.body()
 
     headers = {}
