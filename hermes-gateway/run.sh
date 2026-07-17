@@ -18,4 +18,4 @@ fi
 uv sync
 
 # 启动（通过 uv run 在虚拟环境中执行）
-exec uv run uvicorn main:app --host "${GATEWAY_HOST:-0.0.0.0}" --port "${GATEWAY_PORT:-8000}"
+exec uv run uvicorn main:app --host "${GATEWAY_HOST:-0.0.0.0}" --port "${GATEWAY_PORT:-8200}"

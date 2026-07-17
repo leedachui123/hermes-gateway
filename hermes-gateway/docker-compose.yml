@@ -16,7 +16,7 @@ services:
       - GATEWAY_SECRET_KEY=${GATEWAY_SECRET_KEY:?必须设置 GATEWAY_SECRET_KEY}
       - GATEWAY_USERNAME=${GATEWAY_USERNAME:-admin}
       - GATEWAY_PASSWORD=${GATEWAY_PASSWORD:?必须设置 GATEWAY_PASSWORD}
-      - HERMES_BASE_URL=http://host.docker.internal:9090
+      - HERMES_BASE_URL=http://host.docker.internal:9119
       - GATEWAY_COOKIE_SECURE=true
     ports:
       - "127.0.0.1:8000:8000"
