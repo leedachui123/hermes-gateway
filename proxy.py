@@ -4,7 +4,7 @@ import httpx
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, StreamingResponse
 
-HERMES_BASE_URL = os.environ.get("HERMES_BASE_URL", "http://127.0.0.1:9090")
+HERMES_BASE_URL = os.environ.get("HERMES_BASE_URL", "http://127.0.0.1:9119")
 
 HOP_BY_HOP_HEADERS = frozenset({
     "host", "content-length", "transfer-encoding", "connection",
