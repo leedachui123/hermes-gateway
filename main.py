@@ -30,7 +30,7 @@ COOKIE_MAX_AGE = 86400  # 24h
 PUBLIC_PATHS = {"/login", "/health", "/api/logout"}
 PUBLIC_PREFIXES = {"/api/login"}
 
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory="hermes-gateway/templates")
 
 
 # ---------- lifespan ----------
