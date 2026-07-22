@@ -1,5 +1,12 @@
 # Hermes Gateway — Docker 镜像自动构建与发布
-# 触发条件：推送匹配 release-v* 的 tag 时自动构建并推送到 ghcr.io
+# 触发条件：推送匹配 release-v* 的 tag 时自动构建并推送到镜像仓库
+#
+# 需要在仓库 Settings → Secrets and variables → Actions 中配置：
+#
+#   DOCKER_REGISTRY_URL       （必填）镜像仓库地址，如 registry.cn-hangzhou.aliyuncs.com
+#   DOCKER_REGISTRY_USERNAME  （必填）登录用户名
+#   DOCKER_REGISTRY_PASSWORD  （必填）登录密码 / Token
+#   IMAGE_NAME                （可选）镜像名，默认 hermes-gateway
 ---
 name: Build & Push Docker Image
 
@@ -9,15 +16,14 @@ on:
       - 'release-v*'
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: hermes-gateway
+  REGISTRY: ${{ secrets.DOCKER_REGISTRY_URL }}
+  IMAGE_NAME: ${{ vars.IMAGE_NAME || 'hermes-gateway' }}
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+    # 如果未配置仓库地址则跳过
+    if: ${{ secrets.DOCKER_REGISTRY_URL != '' }}
 
     steps:
       - name: Checkout repository
@@ -32,12 +38,12 @@ jobs:
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "tag=${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Log in to GitHub Container Registry
+      - name: Log in to Docker Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
+          password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

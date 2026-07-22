@@ -59,19 +59,27 @@ if ! command -v docker &>/dev/null; then
     exit 1
 fi
 
-# ---- 登录检查 ----
+# ---- 登录检查（支持私有仓库）----
 if [ "$PUSH" = "true" ] && [ -n "$REGISTRY" ]; then
     echo ""
     echo "🔑 检查仓库登录状态..."
-    if ! docker system info 2>/dev/null | grep -q "Username"; then
-        if [ -n "${GITHUB_TOKEN:-}" ]; then
-            echo "$GITHUB_TOKEN" | docker login "$REGISTRY" -u "${GITHUB_USER:-$IMAGE_NAME}" --password-stdin 2>/dev/null && \
-                echo "   ✅ 已通过 GITHUB_TOKEN 登录" || \
-                echo "   ⚠  GITHUB_TOKEN 登录失败，尝试已存在的 docker config..."
+    # 优先使用环境变量中的凭证
+    if [ -n "${DOCKER_REGISTRY_USERNAME:-}" ] && [ -n "${DOCKER_REGISTRY_PASSWORD:-}" ]; then
+        echo "$DOCKER_REGISTRY_PASSWORD" | docker login "$REGISTRY" \
+            -u "$DOCKER_REGISTRY_USERNAME" --password-stdin 2>/dev/null && \
+            echo "   ✅ 已登录 $REGISTRY" || \
+            echo "   ⚠  DOCKER_REGISTRY_USERNAME/PASSWORD 登录失败"
+    elif [ -n "${GITHUB_TOKEN:-}" ]; then
+        echo "$GITHUB_TOKEN" | docker login "$REGISTRY" -u "${GITHUB_USER:-$IMAGE_NAME}" --password-stdin 2>/dev/null && \
+            echo "   ✅ 已通过 GITHUB_TOKEN 登录" || \
+            echo "   ⚠  GITHUB_TOKEN 登录失败，尝试已存在的 docker config..."
+    else
+        if docker system info 2>/dev/null | grep -q "Username"; then
+            echo "   ✅ 使用已有的 docker config"
         else
             echo "   ⚠  未检测到 registry 登录凭证"
-            echo "   如需推送，请先执行: docker login $REGISTRY"
-            echo "   或 export GITHUB_TOKEN=... GITHUB_USER=..."
+            echo "   请先执行: docker login $REGISTRY"
+            echo "   或设置 DOCKER_REGISTRY_USERNAME / DOCKER_REGISTRY_PASSWORD"
             echo ""
             echo "   继续构建但不推送..."
             PUSH="false"
