@@ -35,10 +35,11 @@ export default {
       loading.value = true
       try {
         const resp = await api.login(username.value, password.value)
-        if (resp.status === 302) {
+        const data = await resp.json()
+        if (data.status === 'ok') {
           router.push('/app/')
         } else {
-          error.value = 'Invalid username or password'
+          error.value = data.detail || 'Invalid username or password'
         }
       } catch (e) {
         error.value = e.message

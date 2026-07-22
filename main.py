@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from auth import (
@@ -136,13 +136,16 @@ async def login_action(request: Request):
     user = authenticate(username, password)
     if user:
         token = create_access_token(user["username"], user["role"])
-        resp = RedirectResponse(url="/app/", status_code=302)
+        resp = JSONResponse(
+            content={"status": "ok", "user": {"username": user["username"], "role": user["role"]}},
+            status_code=200,
+        )
         resp.set_cookie(
             key=COOKIE_NAME, value=token, **_cookie_settings()
         )
         return resp
 
-    return HTMLResponse("Invalid username or password", status_code=401)
+    return JSONResponse({"status": "error", "detail": "Invalid username or password"}, status_code=401)
 
 
 @app.post("/api/logout")
