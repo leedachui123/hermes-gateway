@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 
 from auth import (
     authenticate,
@@ -27,10 +27,10 @@ from proxy import HERMES_BASE_URL, proxy_request
 COOKIE_NAME = "hermes_token"
 COOKIE_MAX_AGE = 86400  # 24h
 
-PUBLIC_PATHS = {"/login", "/health", "/api/logout"}
-PUBLIC_PREFIXES = {"/api/login"}
+PUBLIC_PATHS = {"/login", "/health", "/api/logout", "/app/login"}
+PUBLIC_PREFIXES = {"/api/login", "/app/assets/"}
 
-templates = Jinja2Templates(directory="templates")
+SPA_INDEX_PATH = os.path.join(os.path.dirname(__file__), "frontend", "dist", "index.html")
 
 
 # ---------- lifespan ----------
@@ -47,10 +47,16 @@ async def lifespan(app: FastAPI):
 # ---------- app ----------
 app = FastAPI(
     title="Hermes Gateway",
-    version="0.1.0",
+    version="1.0.0",
     description="Authentication gateway for Hermes agent dashboard",
     lifespan=lifespan,
 )
+
+
+# ---------- serve Vue SPA static assets ----------
+SPA_DIST = os.path.join(os.path.dirname(__file__), "frontend", "dist")
+if os.path.isdir(SPA_DIST):
+    app.mount("/app/assets", StaticFiles(directory=os.path.join(SPA_DIST, "assets")), name="spa_assets")
 
 
 # ---------- auth middleware ----------
@@ -64,11 +70,11 @@ async def auth_middleware(request: Request, call_next):
 
     token = request.cookies.get(COOKIE_NAME)
     if not token:
-        return RedirectResponse(url="/login", status_code=302)
+        return RedirectResponse(url="/app/login", status_code=302)
 
     payload = decode_access_token(token)
     if not payload:
-        resp = RedirectResponse(url="/login", status_code=302)
+        resp = RedirectResponse(url="/app/login", status_code=302)
         resp.delete_cookie(COOKIE_NAME, path="/")
         return resp
 
@@ -94,10 +100,28 @@ def _cookie_settings():
     }
 
 
+def _serve_spa():
+    """Return the SPA index.html if it exists."""
+    if os.path.isfile(SPA_INDEX_PATH):
+        with open(SPA_INDEX_PATH) as f:
+            return HTMLResponse(f.read())
+    return HTMLResponse("<h1>Frontend not built</h1><p>Run <code>cd frontend && npm run build</code></p>", status_code=500)
+
+
+# ---------- SPA routes ----------
+@app.get("/app")
+@app.get("/app/")
+@app.get("/app/{path:path}")
+async def spa_fallback():
+    """Serve the Vue SPA for any /app/* path."""
+    return _serve_spa()
+
+
 # ---------- login / logout ----------
-@app.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request, error: str = None):
-    return templates.TemplateResponse(request, "login.html", {"error": error})
+@app.get("/login")
+async def legacy_login_redirect():
+    """Redirect old login URL to SPA."""
+    return RedirectResponse(url="/app/login", status_code=302)
 
 
 @app.post("/api/login")
@@ -107,33 +131,23 @@ async def login_action(request: Request):
     password = form.get("password") or ""
 
     if not username or not password:
-        return templates.TemplateResponse(
-            request,
-            "login.html",
-            {"error": "Username and password are required"},
-            status_code=422,
-        )
+        return HTMLResponse("Username and password are required", status_code=422)
 
     user = authenticate(username, password)
     if user:
         token = create_access_token(user["username"], user["role"])
-        resp = RedirectResponse(url="/admin", status_code=302)
+        resp = RedirectResponse(url="/app/", status_code=302)
         resp.set_cookie(
             key=COOKIE_NAME, value=token, **_cookie_settings()
         )
         return resp
 
-    return templates.TemplateResponse(
-        request,
-        "login.html",
-        {"error": "Invalid username or password"},
-        status_code=401,
-    )
+    return HTMLResponse("Invalid username or password", status_code=401)
 
 
 @app.post("/api/logout")
 async def logout():
-    resp = RedirectResponse(url="/login", status_code=302)
+    resp = RedirectResponse(url="/app/login", status_code=302)
     resp.delete_cookie(COOKIE_NAME, path="/")
     return resp
 
@@ -141,33 +155,6 @@ async def logout():
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "hermes-gateway"}
-
-
-# ---------- admin page ----------
-@app.get("/admin", response_class=HTMLResponse)
-@app.get("/admin/", response_class=HTMLResponse)
-async def admin_index(request: Request):
-    """Redirect /admin to the user management page."""
-    _require_admin(request)
-    return RedirectResponse(url="/admin/users", status_code=302)
-
-
-@app.get("/admin/users", response_class=HTMLResponse)
-async def admin_users_page(request: Request):
-    role = getattr(request.state, "role", None)
-    if role != "admin":
-        return HTMLResponse(
-            "<h1>403 Forbidden</h1><p>Admin access required.</p>",
-            status_code=403,
-        )
-    return templates.TemplateResponse(
-        request,
-        "admin_users.html",
-        {
-            "username": request.state.username,
-            "role": role,
-        },
-    )
 
 
 # ---------- admin API — user management ----------
@@ -185,7 +172,6 @@ async def api_create_user(request: Request):
     password = body.get("password") or ""
     role = body.get("role", "user")
 
-    # Validation
     if not username or not password:
         raise HTTPException(status_code=422, detail="username and password are required")
     if len(password) < 6:
@@ -204,18 +190,15 @@ async def api_update_user(request: Request, user_id: int):
     _require_admin(request)
     body = await request.json()
 
-    # Check user exists
     existing = get_user_by_id(user_id)
     if not existing:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Validate fields
     username = body.get("username")
     if username is not None:
         username = username.strip()
         if not username:
             raise HTTPException(status_code=422, detail="Username cannot be empty")
-        # Check for duplicates (excluding self)
         dup = get_user_by_username(username)
         if dup and dup["id"] != user_id:
             raise HTTPException(status_code=409, detail="Username already exists")
@@ -241,12 +224,10 @@ async def api_update_user(request: Request, user_id: int):
 async def api_delete_user(request: Request, user_id: int):
     _require_admin(request)
 
-    # Cannot delete yourself
     current = get_user_by_username(request.state.username)
     if current and current["id"] == user_id:
         raise HTTPException(status_code=400, detail="Cannot delete yourself")
 
-    # Cannot delete the last admin
     target = get_user_by_id(user_id)
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
@@ -294,7 +275,6 @@ async def api_change_own_password(request: Request):
     if len(new_password) < 6:
         raise HTTPException(status_code=422, detail="New password must be at least 6 characters")
 
-    # Verify current password
     user = get_user_by_username(request.state.username)
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
@@ -309,6 +289,10 @@ async def api_change_own_password(request: Request):
 # ---------- catch-all proxy ----------
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"])
 async def catch_all(request: Request, path: str = ""):
+    # Don't proxy paths that the SPA or API handles
+    if path.startswith("app/") or path.startswith("api/") or path == "health":
+        raise HTTPException(status_code=404)
+
     client: httpx.AsyncClient = request.app.state.httpx_client
     target = f"/{path}" if path else "/"
     return await proxy_request(client, request, target)

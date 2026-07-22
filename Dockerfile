@@ -10,7 +10,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 
 COPY auth.py proxy.py main.py ./
-COPY templates/ templates/
+COPY frontend/dist/ frontend/dist/
 
 EXPOSE 8000
 
