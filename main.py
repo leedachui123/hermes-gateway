@@ -116,25 +116,6 @@ async def login_action(request: Request):
 
     user = authenticate(username, password)
     if user:
-        # Verify Hermes backend connectivity
-        client: httpx.AsyncClient = request.app.state.httpx_client
-        try:
-            await client.get("/", timeout=5.0)
-        except httpx.ConnectError:
-            return templates.TemplateResponse(
-                request,
-                "login.html",
-                {"error": "Hermes 后端无法连接，请确认服务已启动后重试"},
-                status_code=503,
-            )
-        except httpx.TimeoutException:
-            return templates.TemplateResponse(
-                request,
-                "login.html",
-                {"error": "Hermes 后端响应超时，请稍后重试"},
-                status_code=504,
-            )
-
         token = create_access_token(user["username"], user["role"])
         resp = RedirectResponse(url="/", status_code=302)
         resp.set_cookie(
