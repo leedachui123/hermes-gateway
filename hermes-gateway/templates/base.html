@@ -238,9 +238,9 @@
 </head>
 <body>
   <nav class="navbar">
-    <a href="/" class="navbar-brand">🔐 Hermes Gateway</a>
+    <a href="/admin/users" class="navbar-brand">🔐 Hermes Gateway</a>
     <ul class="navbar-nav">
-      <li><a href="/">Dashboard</a></li>
+      <li><a href="/admin/users">Dashboard</a></li>
       {% if role == 'admin' %}
       <li><a href="/admin/users" class="{% if active_nav == 'users' %}active{% endif %}">User Management</a></li>
       {% endif %}
