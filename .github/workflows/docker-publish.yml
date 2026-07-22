@@ -22,9 +22,6 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    # 如果未配置仓库地址则跳过
-    if: ${{ secrets.DOCKER_REGISTRY_URL != '' }}
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
