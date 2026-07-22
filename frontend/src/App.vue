@@ -5,6 +5,7 @@
       <div class="nav-links">
         <router-link to="/app/">Dashboard</router-link>
         <router-link v-if="user?.role === 'admin'" to="/app/admin/users">User Management</router-link>
+        <a href="http://47.109.43.104:9119" target="_blank" class="nav-hermes" title="Open Hermes Agent">🤖 Hermes</a>
       </div>
       <div class="nav-right">
         <span class="user-info">👤 {{ user?.username }}</span>
@@ -88,6 +89,20 @@ body {
 .nav-links a:hover, .nav-links a.router-link-exact-active {
   color: #1677ff;
   border-bottom-color: #1677ff;
+}
+.nav-hermes {
+  font-size: 14px;
+  color: #555;
+  text-decoration: none;
+  padding: 4px 0;
+  border-bottom: 2px solid transparent;
+  transition: all .2s;
+  opacity: 0.7;
+}
+.nav-hermes:hover {
+  color: #722ed1;
+  border-bottom-color: #722ed1;
+  opacity: 1;
 }
 .nav-right { display: flex; align-items: center; gap: 12px; }
 .user-info { font-size: 14px; color: #555; }
