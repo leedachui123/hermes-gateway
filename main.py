@@ -117,7 +117,7 @@ async def login_action(request: Request):
     user = authenticate(username, password)
     if user:
         token = create_access_token(user["username"], user["role"])
-        resp = RedirectResponse(url="/", status_code=302)
+        resp = RedirectResponse(url="/admin", status_code=302)
         resp.set_cookie(
             key=COOKIE_NAME, value=token, **_cookie_settings()
         )
